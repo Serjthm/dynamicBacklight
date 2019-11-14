@@ -3,9 +3,6 @@
 #include <RTClib.h>
 #include <GyverEncoder.h>
 
-
-
-
 // Пункты меню:
 // Дата и время (вывод) id = 1
 // Дата и время (установка) id = 2
