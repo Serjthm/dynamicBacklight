@@ -1136,13 +1136,11 @@ void editSundown()
 {
     lcd.home();
     lcd.print("Sundown menu");
-    }
-
 }
 
 void systemOutput()
 {
-        lcd.setCursor(0, 0);
+    lcd.setCursor(0, 0);
     lcd.print("System output ");
     
     lcd.setCursor(0, 1);
