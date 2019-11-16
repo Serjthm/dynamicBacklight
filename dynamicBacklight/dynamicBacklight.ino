@@ -4,32 +4,38 @@
 #include <GyverEncoder.h>
 
 // Пункты меню:
-// Дата и время (вывод) id = 1
-// Дата и время (установка) id = 2
-// Время вклчения света и скорость полного включенияid = 3
-// Время выключения света и скорость полного выключения = 4
+// Дата и время (вывод)                                 id = 1
+// Дата и время (установка)                             id = 2
+// Время вклчения света и скорость полного включения    id = 3
+// Время выключения света и скорость полного выключения id = 4
 
 // lcd.setCursor(col, row);
 
-typedef unsigned char U8;
-typedef unsigned int U16;
-typedef unsigned short UShort;
+typedef unsigned char   U8;
+typedef unsigned int    U16;
+typedef unsigned short  UShort;
+
+#define RELAY_LED       0
+#define RELAY_UV_LAMP   0
+#define PWM_LED         0
 
 LiquidCrystal_I2C lcd = LiquidCrystal_I2C(0x27, 16, 2);
+
 RTC_DS3231 rtc;
-char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-U8 daysOnMonth[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30 , 31, 30, 31};
-Encoder enc(2, 3, 4);
+char daysOfTheWeek[7][12]   = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+U8 daysOnMonth[12]          = {31, 28, 31, 30, 31, 30, 31, 31, 30 , 31, 30, 31};
 
 DateTime now;
+
+Encoder enc(2, 3, 4);
 
 enum menuItem
 {
   showTimeDate = 0,
-  editTimeDate,
   editSunrise,
   editSundown,
-  systemMenu
+  systemMenu,
+  //editTimeDate,
 };
 
 enum typeValue
@@ -51,21 +57,20 @@ enum confirm
 
 enum state
 {
-    off = 0,
-    on
+    on = 0,
+    off
 };
 
-U8 menuId = showTimeDate;  // Standart start menu
-U8 flagClear = 1;
-U8 stringPosition = 0;     // Position cursor editing fiedl
-U8 inMenu = 0;             // In menu for editing
-U8 isBlink = 1;             // Blink editing value
-U8 isEdit = 0;
-U8 cursorPosition = 1;
-U8 confirmValue = cancel;
-U8 sunriseStateValue = off;
-U8 sundownStateValue = off;
-
+U8 menuId               = showTimeDate;  // Standart start menu
+U8 flagClear            = 1;
+U8 stringPosition       = 0;     // Position cursor editing fiedl
+U8 inMenu               = 0;             // In menu for editing
+U8 isBlink              = 1;             // Blink editing value
+U8 isEdit               = 0;
+U8 cursorPosition       = 1;
+U8 confirmValue         = cancel;
+U8 sunriseStateValue    = off;
+U8 sundownStateValue    = off;
 
 U8 stepSundown;
 
@@ -100,6 +105,10 @@ void lcdPrintDate();
 void lcdBlink(U16 data, U8 typeValue, U8 sizeCursor);
 void sunrise();
 void sundown();
+void showNowTime();
+void editSundown();
+void editSunrise();
+void systemOutput();
 
 void setup()
 {
@@ -111,22 +120,16 @@ void setup()
     pinMode(5, OUTPUT);
     analogWrite(5, 0);
     
-    setHours = rtc.now().hour(); 
-    setMinutes = rtc.now().minute();
-    setDay = rtc.now().day();
-    setMonth = rtc.now().month();
-    setYear = rtc.now().year();
+    setHours    = rtc.now().hour(); 
+    setMinutes  = rtc.now().minute();
+    setDay      = rtc.now().day();
+    setMonth    = rtc.now().month();
+    setYear     = rtc.now().year();
 
 }
 void loop()
 {
     now = rtc.now();
-//    setYear         = now.year();
-//    setMonth        = now.month();
-//    setDay          = now.day();
-//    setDayOfWeek    = now.dayOfTheWeek();
-//    setHours        = now.hour(); 
-//    setMinutes      = now.minute();
        
     enc.tick();
 
@@ -437,45 +440,7 @@ void loop()
   {
     case showTimeDate: // Show date and time
       {
-        lcd.setCursor(0, 0);
-        if (now.hour() < 10)
-        {
-          lcd.print("0");
-        }
-        lcd.print(now.hour(), DEC);
-        
-        lcd.print(":");
-
-        if (now.minute() < 10)
-        {
-          lcd.print("0");
-        }
-        lcd.print(now.minute(), DEC);
-        
-        lcd.print(":");
-        
-        if (now.second() < 10)
-        {
-          lcd.print("0");
-        }
-        else
-        lcd.setCursor(6, 0);
-              
-//        if (now.second() == 10 && !isEdit)
-//        {
-//          lcd.setCursor(8, 0);
-//          lcd.print(" ");
-//          isEdit = 1;
-//        }
-//        if (now.second() > 10 && isEdit)
-//        {
-//          isEdit = 0;
-//        }
-        lcd.print(now.second(), DEC);
-
-        lcdPrintTempAndDay();
-        timer_1 = millis();
-        flagClear = 0;
+        showNowTime();
         break;
       }
     case editTimeDate: // Set date and time
@@ -715,7 +680,177 @@ void loop()
       }
     case editSunrise:
     {
-        if(!inMenu)
+        editSunrise();
+        break;
+      }
+    case editSundown:
+    {
+        editSundown();
+        break;
+    }
+    case systemMenu:
+    {
+        systemOutput();
+        break;
+    }
+    default:
+    {
+        lcd.home();
+        lcd.print("in default");
+        break;
+    }
+  }
+}
+
+void lcdPrintTempAndDay()
+{
+  lcd.setCursor(0, 1);
+  lcd.print(daysOfTheWeek[now.dayOfTheWeek()]);
+  lcd.print(" T: ");
+  lcd.print((int)rtc.getTemperature());
+  lcd.print(" C");
+}
+
+void lcdPrintDate()
+{
+    lcd.setCursor(0, 1);
+    if(setDay < 10)
+    {
+        lcd.print("0");
+    }
+    lcd.print(setDay);
+
+    lcd.print(".");
+    
+    if(setMonth < 10)
+    {
+        lcd.print("0");
+    }
+    lcd.print(setMonth);
+
+    lcd.print(".");
+
+    lcd.print(setYear);
+}
+
+void lcdBlink(U16 data, U8 typeValue, U8 sizeCursor)
+{
+    if ((millis() - timer_2) > 500)
+    {  
+        if (isBlink)        // Если данные видны на дисплее, то скрываем их
+        {
+            for (U8 i = 0; i < sizeCursor; ++i)
+            {
+                lcd.print(" ");
+            }
+            isBlink = 0;
+        }
+    else 
+    {
+        if (typeValue == timeValue && data < 10)
+        {
+            lcd.print("0");
+            lcd.print(data);
+        }
+        else if (typeValue == timeValue && data >= 10)
+        {
+            lcd.print(data);
+        }
+        else if(typeValue == spacerValue)
+        {
+            lcd.print(":");
+        }
+
+        else if(typeValue == okCancelValue)
+        {
+            lcd.setCursor(10, 0);
+            if(data == ok)
+            {
+                lcd.print("    Ok");
+            }
+            else
+            {
+                lcd.print("Cancel");
+            }
+        }  
+                 
+        else if(typeValue == offOnValue)
+        {
+            lcd.setCursor(7, 1);
+            if(data == on)
+            {
+                lcd.print(" ON");   
+            }
+            else
+            {
+                lcd.print("OFF");
+            }
+        }
+        else if(typeValue == dayValue)
+        {
+            if(data < 10)
+            {
+                lcd.print("0");
+            }
+            lcd.print(data);
+        }
+        else if(typeValue == monthValue)
+        {
+            if(data < 10)
+            {
+                lcd.print("0");
+            }
+            lcd.print(data);
+        }
+        else if(typeValue == yearValue)
+        {
+            lcd.print(data);
+        
+        }
+        isBlink = 1;
+    }
+    timer_2 = millis();
+  }
+}
+
+void showNowTime()
+{
+    lcd.setCursor(0, 0);
+    if (now.hour() < 10)
+    {
+        lcd.print("0");
+    }
+    lcd.print(now.hour(), DEC);
+    
+    lcd.print(":");
+    
+    if (now.minute() < 10)
+    {
+        lcd.print("0");
+    }
+    lcd.print(now.minute(), DEC);
+    
+    lcd.print(":");
+    
+    if (now.second() < 10)
+    {
+        lcd.print("0");
+    }
+    else
+    {
+        lcd.setCursor(6, 0);
+    }
+    
+    lcd.print(now.second(), DEC);
+    
+    lcdPrintTempAndDay();
+    timer_1 = millis();
+    flagClear = 0;
+}
+
+void editSunrise()
+{
+    if(!inMenu)
         {
             lcd.home();
             lcd.print("Sunrise");
@@ -996,141 +1131,21 @@ void loop()
                 cursorPosition = 1;
             }
         }
-        break;
-      }
-    case editSundown:
-      {
-        lcd.home();
-        lcd.print("Sundown menu");
-        break;
-      }
-    case systemMenu:
-      {
+}
+void editSundown()
+{
+    lcd.home();
+    lcd.print("Sundown menu");
+    }
+
+}
+
+void systemOutput()
+{
         lcd.setCursor(0, 0);
-        lcd.print("System output");
-        lcd.setCursor(0, 1);
-        lcd.print("i : ");
-        lcd.print("   ");
-        lcd.setCursor(4, 1);
-        lcd.print(i);
-        break;
-      }
-    default:
-      {
-        lcd.home();
-        lcd.print("in default");
-        break;
-      }
-  }
-}
-
-void lcdPrintTempAndDay()
-{
-  lcd.setCursor(0, 1);
-  lcd.print(daysOfTheWeek[now.dayOfTheWeek()]);
-  lcd.print(" T: ");
-  lcd.print((int)rtc.getTemperature());
-  lcd.print(" C");
-}
-
-void lcdPrintDate()
-{
-    lcd.setCursor(0, 1);
-    if(setDay < 10)
-    {
-        lcd.print("0");
-    }
-    lcd.print(setDay);
-
-    lcd.print(".");
+    lcd.print("System output ");
     
-    if(setMonth < 10)
-    {
-        lcd.print("0");
-    }
-    lcd.print(setMonth);
-
-    lcd.print(".");
-
-    lcd.print(setYear);
-}
-
-void lcdBlink(U16 data, U8 typeValue, U8 sizeCursor)
-{
-    if ((millis() - timer_2) > 500)
-    {  
-        if (isBlink)        // Если данные видны на дисплее, то скрываем их
-        {
-            for (U8 i = 0; i < sizeCursor; ++i)
-            {
-                lcd.print(" ");
-            }
-            isBlink = 0;
-        }
-    else 
-    {
-        if (typeValue == timeValue && data < 10)
-        {
-            lcd.print("0");
-            lcd.print(data);
-        }
-        else if (typeValue == timeValue && data >= 10)
-        {
-            lcd.print(data);
-        }
-        else if(typeValue == spacerValue)
-        {
-            lcd.print(":");
-        }
-
-        else if(typeValue == okCancelValue)
-        {
-            lcd.setCursor(10, 0);
-            if(data == ok)
-            {
-                lcd.print("    Ok");
-            }
-            else
-            {
-                lcd.print("Cancel");
-            }
-        }  
-                 
-        else if(typeValue == offOnValue)
-        {
-            lcd.setCursor(7, 1);
-            if(data == on)
-            {
-                lcd.print(" ON");   
-            }
-            else
-            {
-                lcd.print("OFF");
-            }
-        }
-        else if(typeValue == dayValue)
-        {
-            if(data < 10)
-            {
-                lcd.print("0");
-            }
-            lcd.print(data);
-        }
-        else if(typeValue == monthValue)
-        {
-            if(data < 10)
-            {
-                lcd.print("0");
-            }
-            lcd.print(data);
-        }
-        else if(typeValue == yearValue)
-        {
-            lcd.print(data);
-        
-        }
-        isBlink = 1;
-    }
-    timer_2 = millis();
-  }
+    lcd.setCursor(0, 1);
+    lcd.print("U_LONG : ");
+    lcd.print(sizeof(unsigned long));
 }
