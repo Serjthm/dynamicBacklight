@@ -35,7 +35,6 @@ enum menuItem
   editSunrise,
   editSundown,
   systemMenu,
-  //editTimeDate,
 };
 
 enum typeValue
@@ -61,17 +60,18 @@ enum state
     off
 };
 
-U8 menuId               = showTimeDate;  // Standart start menu
+U8 menuId               = showTimeDate;     // Standart start menu
 U8 flagClear            = 1;
-U8 stringPosition       = 0;     // Position cursor editing fiedl
-U8 inMenu               = 0;             // In menu for editing
-U8 isBlink              = 1;             // Blink editing value
+U8 stringPosition       = 0;                // Position cursor editing fiedl
+U8 inMenu               = 0;                // In menu for editing
+U8 inTimeEditMenu       = 0;
+U8 isBlink              = 1;                // Blink editing value
 U8 isEdit               = 0;
 U8 cursorPosition       = 1;
 U8 confirmValue         = cancel;
 U8 sunriseStateValue    = off;
 U8 sundownStateValue    = off;
-
+U8 editTimeDate         = off;
 U8 stepSundown;
 
 unsigned long timer_1 = millis();
@@ -79,12 +79,12 @@ unsigned long timer_2 = millis();
 unsigned long sunriseTimer;
 
 // Set time and day of week
-static U8 setHours;// = rtc.now().hour(); 
-static U8 setMinutes;// = rtc.now().minute();
+static U8 setHours;
+static U8 setMinutes;
 static U8 setDayOfWeek;
-static U8 setDay;// = rtc.now().day();
-static U8 setMonth;// = rtc.now().month();
-static U16 setYear;// = rtc.now().year();
+static U8 setDay;
+static U8 setMonth;
+static U16 setYear;
 
 // Set time and spees of sunrise
 U8 sunRiseHours      = 0;
@@ -106,6 +106,8 @@ void lcdBlink(U16 data, U8 typeValue, U8 sizeCursor);
 void sunrise();
 void sundown();
 void showNowTime();
+void showEditTime();
+void editNowTime();
 void editSundown();
 void editSunrise();
 void systemOutput();
@@ -117,6 +119,7 @@ void setup()
     lcd.clear();
     
     enc.setType(TYPE1);
+
     pinMode(5, OUTPUT);
     analogWrite(5, 0);
     
@@ -130,16 +133,24 @@ void setup()
 void loop()
 {
     now = rtc.now();
-       
     enc.tick();
 
   if (enc.isHolded())
   {
     lcd.clear();
+    if (inMenu == 0 && menuId == showTimeDate && editTimeDate == off)
+    {
+        editTimeDate = on;
+    }
+
+    if(menuId == showTimeDate && inMenu == 1 && editTimeDate = on)
+    {
+
+    }
+
     if(inMenu == 1 && menuId == editTimeDate && confirmValue == ok)
     {
         rtc.adjust(DateTime(setYear, setMonth, setDay, setHours, setMinutes));
-        // Требуется установка года, месяца, дня и времени
         menuId = showTimeDate;
     }
 
@@ -147,8 +158,7 @@ void loop()
     {
         if (sunriseStateValue == on)
         {
-            stepSunrise = (sunRiseSpeed * 60) / 255;       // Каждые stepSunrise секунд увеличиваем значение analogWrite на 1;
-            
+            stepSunrise = (sunRiseSpeed * 60) / 255;  // Каждые stepSunrise секунд увеличиваем значение analogWrite на 1;
         }
         menuId = showTimeDate;
     }
@@ -439,12 +449,23 @@ void loop()
   switch (menuId)
   {
     case showTimeDate: // Show date and time
-      {
-        showNowTime();
+    {
+        if(!inMenu)
+        {
+          showNowTime();
+        }
+        else if(editTimeDate == on && inTimeEditMenu == 0)
+        {
+          showEditTime();
+        }
+        else if(editTimeDate == on && inTimeEditMenu == 1)
+        {
+          editNowTime();       
+        }
         break;
-      }
+    }
     case editTimeDate: // Set date and time
-      {
+    {
         if (!inMenu) // Show current time and day of week
         {
           lcd.setCursor(0, 0);
@@ -467,7 +488,468 @@ void loop()
         }
         else
         {
-          lcd.setCursor(11, 1);
+          
+        }
+        break;
+    }
+    case editSunrise:
+    {
+        editSunrise();
+        break;
+    }
+    case editSundown:
+    {
+        editSundown();
+        break;
+    }
+    case systemMenu:
+    {
+        systemOutput();
+        break;
+    }
+    default:
+    {
+        lcd.home();
+        lcd.print("in default");
+        break;
+    }
+  }
+}
+
+void lcdPrintTempAndDay()
+{
+  lcd.setCursor(0, 1);
+  lcd.print(daysOfTheWeek[now.dayOfTheWeek()]);
+  lcd.print(" T: ");
+  lcd.print((int)rtc.getTemperature());
+  lcd.print(" C");
+}
+
+void lcdPrintDate()
+{
+    lcd.setCursor(0, 1);
+    if(setDay < 10)
+    {
+        lcd.print("0");
+    }
+    lcd.print(setDay);
+
+    lcd.print(".");
+    
+    if(setMonth < 10)
+    {
+        lcd.print("0");
+    }
+    lcd.print(setMonth);
+
+    lcd.print(".");
+
+    lcd.print(setYear);
+}
+
+void lcdBlink(U16 data, U8 typeValue, U8 sizeCursor)
+{
+    if ((millis() - timer_2) > 500)
+    {  
+        if (isBlink)        // Если данные видны на дисплее, то скрываем их
+        {
+            for (U8 i = 0; i < sizeCursor; ++i)
+            {
+                lcd.print(" ");
+            }
+            isBlink = 0;
+        }
+    else 
+    {
+        if (typeValue == timeValue && data < 10)
+        {
+            lcd.print("0");
+            lcd.print(data);
+        }
+        else if (typeValue == timeValue && data >= 10)
+        {
+            lcd.print(data);
+        }
+        else if(typeValue == spacerValue)
+        {
+            lcd.print(":");
+        }
+
+        else if(typeValue == okCancelValue)
+        {
+            lcd.setCursor(10, 0);
+            if(data == ok)
+            {
+                lcd.print("    Ok");
+            }
+            else
+            {
+                lcd.print("Cancel");
+            }
+        }  
+                 
+        else if(typeValue == offOnValue)
+        {
+            lcd.setCursor(7, 1);
+            if(data == on)
+            {
+                lcd.print(" ON");   
+            }
+            else
+            {
+                lcd.print("OFF");
+            }
+        }
+        else if(typeValue == dayValue)
+        {
+            if(data < 10)
+            {
+                lcd.print("0");
+            }
+            lcd.print(data);
+        }
+        else if(typeValue == monthValue)
+        {
+            if(data < 10)
+            {
+                lcd.print("0");
+            }
+            lcd.print(data);
+        }
+        else if(typeValue == yearValue)
+        {
+            lcd.print(data);
+        
+        }
+        isBlink = 1;
+    }
+    timer_2 = millis();
+  }
+}
+
+void showNowTime()
+{
+    lcd.setCursor(0, 0);
+    if (now.hour() < 10)
+    {
+        lcd.print("0");
+    }
+    lcd.print(now.hour(), DEC);
+    
+    lcd.print(":");
+    
+    if (now.minute() < 10)
+    {
+        lcd.print("0");
+    }
+    lcd.print(now.minute(), DEC);
+    
+    lcd.print(":");
+    
+    if (now.second() < 10)
+    {
+        lcd.print("0");
+    }
+    else
+    {
+        lcd.setCursor(6, 0);
+    }
+    
+    lcd.print(now.second(), DEC);
+    
+    lcdPrintTempAndDay();
+    timer_1 = millis();
+    flagClear = 0;
+}
+
+void editSunrise()
+{
+    if(!inMenu)
+    {
+        lcd.home();
+        lcd.print("Sunrise");
+    
+        lcd.setCursor(0, 1);
+        if(sunRiseHours < 10)
+        {
+            lcd.print("0");
+        }
+        lcd.print(sunRiseHours);
+        lcd.print(":");
+        if(sunRiseMinutes < 10)
+        {
+            lcd.print("0");
+        }
+        lcd.print(sunRiseMinutes);
+        
+        lcd.setCursor(7, 1);
+        if(sunriseStateValue == off)
+        {
+            lcd.print("OFF");
+        }
+        else
+        {
+            lcd.print("ON");
+        }
+        
+        lcd.setCursor(13, 1);
+        if(sunRiseSpeed < 10)
+        {
+            lcd.print("0");
+        }
+        lcd.print(sunRiseSpeed);
+    }
+    else
+    {
+        if (cursorPosition == 1)    // Set start hours
+        {
+            lcd.home();
+            lcd.print("Sunrise");
+            lcd.setCursor(0, 1);
+            lcdBlink(sunRiseHours, timeValue, 2);
+            
+            lcd.setCursor(2, 1);
+            lcd.print(":");
+            
+            if (setMinutes < 10)
+            {
+                lcd.print("0");
+            }
+            lcd.print(setMinutes);
+
+            lcd.setCursor(7, 1);
+            if(sunriseStateValue == off)
+            {
+                lcd.print("OFF");
+            }
+            else
+            {
+                lcd.print(" ON");
+            }
+            lcd.setCursor(10, 0);
+            if(confirmValue ==  ok)
+            {
+                lcd.print("    Ok");
+            }
+            else
+            {
+                lcd.print("Cancel");
+            }
+            
+            lcd.setCursor(13, 1);
+            if(sunRiseSpeed < 10)
+            {
+                lcd.print("0");
+            }
+            lcd.print(sunRiseSpeed);
+            } 
+
+        if (cursorPosition == 2)    // Set start minutes
+        {
+            lcd.home();
+            lcd.print("Sunrise");
+            
+            lcd.setCursor(0, 1);
+            if(sunRiseHours < 10)
+            {
+            lcd.print("0");
+            }
+            lcd.print(sunRiseHours);
+
+            lcd.setCursor(2, 1);
+            lcd.print(":");
+            
+            lcdBlink(sunRiseMinutes, timeValue, 2);
+
+            lcd.setCursor(7, 1);
+            if(sunriseStateValue == off)
+            {
+                lcd.print("OFF");
+            }
+            else
+            {
+                lcd.print(" ON");
+            }               
+            
+            if(confirmValue ==  ok)
+            {
+                lcd.setCursor(10, 0);
+                lcd.print("    Ok");
+            }
+            else
+            {
+                lcd.setCursor(10, 0);
+                lcd.print("Cancel");
+            }
+            lcd.setCursor(13, 1);
+            if(sunRiseSpeed < 10)
+            {
+                lcd.print("0");
+            }
+            lcd.print(sunRiseSpeed);
+            }
+
+        if (cursorPosition == 3)    // Set speed sunrise
+        {
+            lcd.home();
+            lcd.print("Sunrise");
+            
+            lcd.setCursor(0, 1);
+            if(sunRiseHours < 10)
+            {
+            lcd.print("0");
+            }
+            lcd.print(sunRiseHours);
+
+            lcd.setCursor(2, 1);
+            lcd.print(":");
+            
+            if(sunRiseMinutes < 10)
+            {
+            lcd.print("0");
+            }
+            lcd.print(sunRiseMinutes);
+
+            lcd.setCursor(7, 1);
+            if(sunriseStateValue == off)
+            {
+                lcd.print("OFF");
+            }
+            else
+            {
+                lcd.print(" ON");
+            }               
+
+            lcd.setCursor(13, 1);
+            lcdBlink(sunRiseSpeed, timeValue, 3);
+
+            lcd.setCursor(10, 0);
+            if(confirmValue ==  ok)
+            {
+                lcd.print("    Ok");
+            }
+            else
+            {
+                lcd.print("Cancel");
+            }
+        }
+
+        if (cursorPosition == 4)    // Set OFF-ON
+        {
+            lcd.home();
+            lcd.print("Sunrise");
+            
+            lcd.setCursor(0, 1);
+            if(sunRiseHours < 10)
+            {
+            lcd.print("0");
+            }
+            lcd.print(sunRiseHours);
+
+            lcd.setCursor(2, 1);
+            lcd.print(":");
+            
+            if(sunRiseMinutes < 10)
+            {
+            lcd.print("0");
+            }
+            lcd.print(sunRiseMinutes);            
+
+            lcd.setCursor(13, 1);
+            if(sunRiseSpeed < 10)
+            {
+                lcd.print("0");
+            }
+            lcd.print(sunRiseSpeed);
+            
+            lcd.setCursor(10, 0);
+            if(confirmValue ==  ok)
+            {
+                lcd.print("    Ok");
+            }
+            else
+            {
+                lcd.print("Cancel");
+            }
+
+            if(sunRiseSpeed < 10)
+            {
+                lcd.print("0");
+            }
+            lcd.print(sunRiseSpeed);
+
+            lcd.setCursor(7, 1);
+            lcdBlink(sunriseStateValue, offOnValue, 3);
+        }
+    
+        if (cursorPosition == 5)    // Set confirm
+        {
+            lcd.home();
+            lcd.print("Sunrise");
+            
+            lcd.setCursor(0, 1);
+            if(sunRiseHours < 10)
+            {
+                lcd.print("0");
+            }
+            lcd.print(sunRiseHours);
+
+            lcd.setCursor(2, 1);
+            lcd.print(":");
+            
+            if(sunRiseMinutes < 10)
+            {
+                lcd.print("0");
+            }
+            lcd.print(sunRiseMinutes);
+
+            lcd.setCursor(7, 1);
+            if(sunriseStateValue == off)
+            {
+                lcd.print("OFF");
+            }
+            else
+            {
+                lcd.print(" ON");
+            }               
+
+            lcd.setCursor(13, 1);
+            if(sunRiseSpeed < 10)
+            {
+                lcd.print("0");
+            }
+            lcd.print(sunRiseSpeed);
+
+
+            lcd.setCursor(10, 0);
+            lcdBlink(confirmValue, okCancelValue, 6);
+        }
+        
+        if (cursorPosition == 6)
+        {
+            cursorPosition = 1;
+        }
+    }
+}
+void editSundown()
+{
+    lcd.home();
+    lcd.print("Sundown menu");
+}
+
+void systemOutput()
+{
+    lcd.setCursor(0, 0);
+    lcd.print("System output ");
+    
+    lcd.setCursor(0, 1);
+    lcd.print("U_LONG : ");
+    lcd.print(sizeof(unsigned long));
+}
+
+void editNowTime()
+{
+  lcd.setCursor(11, 1);
           lcd.print("#edit");
           
           if(cursorPosition == 1)   // Set hours
@@ -675,475 +1157,25 @@ void loop()
           lcd.setCursor(10, 0);
           lcdBlink(confirmValue, okCancelValue, 6);
           }
-        }
-        break;
-      }
-    case editSunrise:
-    {
-        editSunrise();
-        break;
-      }
-    case editSundown:
-    {
-        editSundown();
-        break;
-    }
-    case systemMenu:
-    {
-        systemOutput();
-        break;
-    }
-    default:
-    {
-        lcd.home();
-        lcd.print("in default");
-        break;
-    }
+}
+
+void showEditTime()
+{
+  lcd.setCursor(0, 0);
+  if (setHours < 10)
+  {
+    lcd.print("0");
   }
-}
+  lcd.print(setHours, DEC);
 
-void lcdPrintTempAndDay()
-{
-  lcd.setCursor(0, 1);
-  lcd.print(daysOfTheWeek[now.dayOfTheWeek()]);
-  lcd.print(" T: ");
-  lcd.print((int)rtc.getTemperature());
-  lcd.print(" C");
-}
+  lcdBlink(0, spacerValue, 1);
 
-void lcdPrintDate()
-{
-    lcd.setCursor(0, 1);
-    if(setDay < 10)
-    {
-        lcd.print("0");
-    }
-    lcd.print(setDay);
-
-    lcd.print(".");
-    
-    if(setMonth < 10)
-    {
-        lcd.print("0");
-    }
-    lcd.print(setMonth);
-
-    lcd.print(".");
-
-    lcd.print(setYear);
-}
-
-void lcdBlink(U16 data, U8 typeValue, U8 sizeCursor)
-{
-    if ((millis() - timer_2) > 500)
-    {  
-        if (isBlink)        // Если данные видны на дисплее, то скрываем их
-        {
-            for (U8 i = 0; i < sizeCursor; ++i)
-            {
-                lcd.print(" ");
-            }
-            isBlink = 0;
-        }
-    else 
-    {
-        if (typeValue == timeValue && data < 10)
-        {
-            lcd.print("0");
-            lcd.print(data);
-        }
-        else if (typeValue == timeValue && data >= 10)
-        {
-            lcd.print(data);
-        }
-        else if(typeValue == spacerValue)
-        {
-            lcd.print(":");
-        }
-
-        else if(typeValue == okCancelValue)
-        {
-            lcd.setCursor(10, 0);
-            if(data == ok)
-            {
-                lcd.print("    Ok");
-            }
-            else
-            {
-                lcd.print("Cancel");
-            }
-        }  
-                 
-        else if(typeValue == offOnValue)
-        {
-            lcd.setCursor(7, 1);
-            if(data == on)
-            {
-                lcd.print(" ON");   
-            }
-            else
-            {
-                lcd.print("OFF");
-            }
-        }
-        else if(typeValue == dayValue)
-        {
-            if(data < 10)
-            {
-                lcd.print("0");
-            }
-            lcd.print(data);
-        }
-        else if(typeValue == monthValue)
-        {
-            if(data < 10)
-            {
-                lcd.print("0");
-            }
-            lcd.print(data);
-        }
-        else if(typeValue == yearValue)
-        {
-            lcd.print(data);
-        
-        }
-        isBlink = 1;
-    }
-    timer_2 = millis();
+  lcd.setCursor(3, 0);
+  if (setMinutes < 10)
+  {
+    lcd.print("0");
   }
-}
+  lcd.print(setMinutes, DEC);
 
-void showNowTime()
-{
-    lcd.setCursor(0, 0);
-    if (now.hour() < 10)
-    {
-        lcd.print("0");
-    }
-    lcd.print(now.hour(), DEC);
-    
-    lcd.print(":");
-    
-    if (now.minute() < 10)
-    {
-        lcd.print("0");
-    }
-    lcd.print(now.minute(), DEC);
-    
-    lcd.print(":");
-    
-    if (now.second() < 10)
-    {
-        lcd.print("0");
-    }
-    else
-    {
-        lcd.setCursor(6, 0);
-    }
-    
-    lcd.print(now.second(), DEC);
-    
-    lcdPrintTempAndDay();
-    timer_1 = millis();
-    flagClear = 0;
-}
-
-void editSunrise()
-{
-    if(!inMenu)
-        {
-            lcd.home();
-            lcd.print("Sunrise");
-        
-            lcd.setCursor(0, 1);
-            if(sunRiseHours < 10)
-            {
-                lcd.print("0");
-            }
-            lcd.print(sunRiseHours);
-            lcd.print(":");
-            if(sunRiseMinutes < 10)
-            {
-                lcd.print("0");
-            }
-            lcd.print(sunRiseMinutes);
-            
-            lcd.setCursor(7, 1);
-            if(sunriseStateValue == off)
-            {
-                lcd.print("OFF");
-            }
-            else
-            {
-                lcd.print("ON");
-            }
-            
-            lcd.setCursor(13, 1);
-            if(sunRiseSpeed < 10)
-            {
-                lcd.print("0");
-            }
-            lcd.print(sunRiseSpeed);
-        }
-        else
-        {
-            if (cursorPosition == 1)    // Set start hours
-            {
-                lcd.home();
-                lcd.print("Sunrise");
-                lcd.setCursor(0, 1);
-                lcdBlink(sunRiseHours, timeValue, 2);
-                
-                lcd.setCursor(2, 1);
-                lcd.print(":");
-                
-                if (setMinutes < 10)
-                {
-                    lcd.print("0");
-                }
-                lcd.print(setMinutes);
-
-                lcd.setCursor(7, 1);
-                if(sunriseStateValue == off)
-                {
-                    lcd.print("OFF");
-                }
-                else
-                {
-                    lcd.print(" ON");
-                }
-                lcd.setCursor(10, 0);
-                if(confirmValue ==  ok)
-                {
-                    lcd.print("    Ok");
-                }
-                else
-                {
-                    lcd.print("Cancel");
-                }
-                
-                lcd.setCursor(13, 1);
-                if(sunRiseSpeed < 10)
-                {
-                    lcd.print("0");
-                }
-                lcd.print(sunRiseSpeed);
-                } 
-
-            if (cursorPosition == 2)    // Set start minutes
-            {
-                lcd.home();
-                lcd.print("Sunrise");
-                
-                lcd.setCursor(0, 1);
-                if(sunRiseHours < 10)
-                {
-                lcd.print("0");
-                }
-                lcd.print(sunRiseHours);
-
-                lcd.setCursor(2, 1);
-                lcd.print(":");
-                
-                lcdBlink(sunRiseMinutes, timeValue, 2);
-
-                lcd.setCursor(7, 1);
-                if(sunriseStateValue == off)
-                {
-                    lcd.print("OFF");
-                }
-                else
-                {
-                    lcd.print(" ON");
-                }               
-                
-                if(confirmValue ==  ok)
-                {
-                    lcd.setCursor(10, 0);
-                    lcd.print("    Ok");
-                }
-                else
-                {
-                    lcd.setCursor(10, 0);
-                    lcd.print("Cancel");
-                }
-                lcd.setCursor(13, 1);
-                if(sunRiseSpeed < 10)
-                {
-                    lcd.print("0");
-                }
-                lcd.print(sunRiseSpeed);
-                }
-
-            if (cursorPosition == 3)    // Set speed sunrise
-            {
-                lcd.home();
-                lcd.print("Sunrise");
-                
-                lcd.setCursor(0, 1);
-                if(sunRiseHours < 10)
-                {
-                lcd.print("0");
-                }
-                lcd.print(sunRiseHours);
-
-                lcd.setCursor(2, 1);
-                lcd.print(":");
-                
-                if(sunRiseMinutes < 10)
-                {
-                lcd.print("0");
-                }
-                lcd.print(sunRiseMinutes);
-
-                lcd.setCursor(7, 1);
-                if(sunriseStateValue == off)
-                {
-                    lcd.print("OFF");
-                }
-                else
-                {
-                    lcd.print(" ON");
-                }               
-
-                lcd.setCursor(13, 1);
-                lcdBlink(sunRiseSpeed, timeValue, 3);
-
-                lcd.setCursor(10, 0);
-                if(confirmValue ==  ok)
-                {
-                    lcd.print("    Ok");
-                }
-                else
-                {
-                    lcd.print("Cancel");
-                }
-            }
-
-            if (cursorPosition == 4)    // Set OFF-ON
-            {
-                lcd.home();
-                lcd.print("Sunrise");
-                
-                lcd.setCursor(0, 1);
-                if(sunRiseHours < 10)
-                {
-                lcd.print("0");
-                }
-                lcd.print(sunRiseHours);
-
-                lcd.setCursor(2, 1);
-                lcd.print(":");
-                
-                if(sunRiseMinutes < 10)
-                {
-                lcd.print("0");
-                }
-                lcd.print(sunRiseMinutes);
-
-//                lcd.setCursor(7, 1);
-//                if(sunriseStateValue == off)
-//                {
-//                    lcd.print("OFF");
-//                }
-//                else
-//                {
-//                    lcd.print(" ON");
-//                }               
-
-                lcd.setCursor(13, 1);
-                if(sunRiseSpeed < 10)
-                {
-                    lcd.print("0");
-                }
-                lcd.print(sunRiseSpeed);
-                
-                lcd.setCursor(10, 0);
-                if(confirmValue ==  ok)
-                {
-                    lcd.print("    Ok");
-                }
-                else
-                {
-                    lcd.print("Cancel");
-                }
-
-                if(sunRiseSpeed < 10)
-                {
-                    lcd.print("0");
-                }
-                lcd.print(sunRiseSpeed);
-
-                lcd.setCursor(7, 1);
-                lcdBlink(sunriseStateValue, offOnValue, 3);
-            }
-        
-            if (cursorPosition == 5)    // Set confirm
-            {
-                lcd.home();
-                lcd.print("Sunrise");
-                
-                lcd.setCursor(0, 1);
-                if(sunRiseHours < 10)
-                {
-                lcd.print("0");
-                }
-                lcd.print(sunRiseHours);
-
-                lcd.setCursor(2, 1);
-                lcd.print(":");
-                
-                if(sunRiseMinutes < 10)
-                {
-                lcd.print("0");
-                }
-                lcd.print(sunRiseMinutes);
-
-                lcd.setCursor(7, 1);
-                if(sunriseStateValue == off)
-                {
-                    lcd.print("OFF");
-                }
-                else
-                {
-                    lcd.print(" ON");
-                }               
-
-                lcd.setCursor(13, 1);
-                if(sunRiseSpeed < 10)
-                {
-                    lcd.print("0");
-                }
-                lcd.print(sunRiseSpeed);
-                
-//                if(sunRiseSpeed < 10)
-//                {
-//                    lcd.print("0");
-//                }
-                //lcd.print(sunRiseSpeed);
-
-                lcd.setCursor(10, 0);
-                lcdBlink(confirmValue, okCancelValue, 6);
-
-            }
-            if (cursorPosition == 6)
-            {
-                cursorPosition = 1;
-            }
-        }
-}
-void editSundown()
-{
-    lcd.home();
-    lcd.print("Sundown menu");
-}
-
-void systemOutput()
-{
-    lcd.setCursor(0, 0);
-    lcd.print("System output ");
-    
-    lcd.setCursor(0, 1);
-    lcd.print("U_LONG : ");
-    lcd.print(sizeof(unsigned long));
+  lcdPrintDate();
 }
